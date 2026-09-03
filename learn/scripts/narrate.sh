@@ -12,14 +12,14 @@
 # 환경변수:
 #   LEARN_TTS_ENGINE  edge(기본) | qwen | say
 #     edge — Microsoft edge-tts(무료·키 불필요, 빠름). 기본 엔진.
-#     qwen — 로컬 Qwen3-TTS(MLX)의 x-vector 클로닝. assets/tts/<이름>/reference.wav가
-#            로컬에 있어야 한다(참조 음성은 저장소에 포함되지 않는 로컬 전용 자산).
+#     qwen — 로컬 Qwen3-TTS(MLX)의 x-vector 클로닝. 사용자가 준비한 참조 음성 폴더
+#            (reference.wav + reference.txt)가 필요하다(저장소에는 포함되지 않는다).
 #     say  — macOS 내장(오프라인, 품질 낮음). 사용자가 명시적으로 요청할 때만 선택.
 #   LEARN_ALLOW_ALTERNATE_TTS 1이어야 say 선택을 허용한다.
 #   LEARN_REUSE_AUDIO 1이면 기존 audio/NN.mp3·NN.cues.json을 보존한 채 player만 다시 만든다.
 #   LEARN_TEXT_ONLY 1이면 TTS를 실행하지 않고 현재 챕터 메뉴가 든 읽기용 player만 만든다.
 #   LEARN_TTS_VOICE   음성 이름. 기본: edge=ko-KR-SunHiNeural, say=Yuna. (qwen은 아래 클론 목소리 사용)
-#   LEARN_TTS_VOICE_NAME qwen 클론 목소리를 이름으로 선택. 내장 assets/tts/<이름>을 먼저 찾고, 없으면 ~/.claude/learn/.voices/<이름>.
+#   LEARN_TTS_VOICE_NAME qwen 클론 목소리를 이름으로 선택. ~/.claude/learn/.voices/<이름>/ 를 사용한다.
 #   LEARN_TTS_VOICE_DIR  목소리 폴더를 경로로 직접 지정(이름보다 우선). 안에 reference.wav + reference.txt 가 목소리의 실체.
 #   LEARN_QWEN_BATCH_SIZE x-vector 텐서 배치 최대 크기. 기본 16. 32는 더 빠르지만 tail-latency 증가 가능.
 #   LEARN_QWEN_CHUNK_CHARS 긴 문장의 내부 분할 상한. 기본 240자(완성 뒤 한 문단 WAV로 재결합).
@@ -52,25 +52,18 @@ MARKED="$SKILL_DIR/scripts/vendor/marked.min.js"
 # TTS 환경은 스킬 코드 밖(데이터 영역)에 두어 스킬을 가볍고 이식 가능하게 유지한다. 없으면 아래에서 자동 생성.
 TTS_VENV="$HOME/.claude/learn/.tts-venv"
 EDGE_BIN="$TTS_VENV/bin/edge-tts"
-# qwen(클로닝 낭독) 설정 — 생성 환경은 캐시하고 참조 목소리는 스킬에 내장한다.
+# qwen(클로닝 낭독) 설정 — 생성 환경은 캐시하고, 참조 목소리는 사용자가 로컬에 준비한다.
 QWEN_VENV="${LEARN_QWEN_VENV:-$HOME/.claude/learn/.tts-venv-qwen-xvector}"
 QWEN_PY="$QWEN_VENV/bin/python"
 QWEN_MODEL="${LEARN_QWEN_MODEL:-mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit}"
 QWEN_REQUIRED_MLX_AUDIO="0.5.0"
-BUILTIN_VOICES_ROOT="$SKILL_DIR/assets/tts"
 EXTERNAL_VOICES_ROOT="$HOME/.claude/learn/.voices"
-DEFAULT_QWEN_VOICE_NAME="interviewee-en-34s"
-# 목소리 선택 우선순위: 경로 직접지정(DIR) > 이름(NAME: 내장 우선, 외부 폴백) > 기본 내장 참조
+DEFAULT_QWEN_VOICE_NAME="default"
+# 목소리 선택 우선순위: 경로 직접지정(DIR) > 이름(NAME) > ~/.claude/learn/.voices/default
 if [ -n "${LEARN_TTS_VOICE_DIR:-}" ]; then
   QWEN_VOICE_DIR="$LEARN_TTS_VOICE_DIR"
-elif [ -n "${LEARN_TTS_VOICE_NAME:-}" ]; then
-  if [ -d "$BUILTIN_VOICES_ROOT/$LEARN_TTS_VOICE_NAME" ]; then
-    QWEN_VOICE_DIR="$BUILTIN_VOICES_ROOT/$LEARN_TTS_VOICE_NAME"
-  else
-    QWEN_VOICE_DIR="$EXTERNAL_VOICES_ROOT/$LEARN_TTS_VOICE_NAME"
-  fi
 else
-  QWEN_VOICE_DIR="$BUILTIN_VOICES_ROOT/$DEFAULT_QWEN_VOICE_NAME"
+  QWEN_VOICE_DIR="$EXTERNAL_VOICES_ROOT/${LEARN_TTS_VOICE_NAME:-$DEFAULT_QWEN_VOICE_NAME}"
 fi
 QWEN_REF_AUDIO="$QWEN_VOICE_DIR/reference.wav"
 QWEN_REF_TEXT_FILE="$QWEN_VOICE_DIR/reference.txt"
@@ -108,7 +101,7 @@ if [ "$NEEDS_TTS" = 1 ] && [ "$ENGINE" = qwen ]; then
   # 참조 음성은 저장소에 포함되지 않는 로컬 전용 자산이다. 환경을 만들기 전에 먼저 확인한다.
   [ -f "$QWEN_REF_AUDIO" ] || {
     echo "클론 목소리 참조 오디오 없음: $QWEN_REF_AUDIO" >&2
-    echo "참조 음성은 저장소에 포함되지 않습니다. 해당 폴더에 reference.wav·reference.txt를 두거나, 기본 엔진(edge)으로 렌더하세요." >&2
+    echo "참조 음성은 저장소에 포함되지 않습니다. LEARN_TTS_VOICE_DIR로 reference.wav·reference.txt가 있는 폴더를 지정하거나, 기본 엔진(edge)으로 렌더하세요." >&2
     exit 1
   }
   [ -f "$QWEN_REF_TEXT_FILE" ] || { echo "클론 목소리 참조 대본 없음: $QWEN_REF_TEXT_FILE" >&2; exit 1; }
