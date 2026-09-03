@@ -1,6 +1,6 @@
 ---
 name: postify
-description: Turns any topic, request, work, or session content into one or more standalone, blog/portfolio-quality markdown posts. The AI autonomously decides the topic framing, category, structure, and whether the material warrants a single post or several. Trigger with /postify.
+description: Turns any topic, request, work, or session content into one or more standalone, blog/portfolio-quality markdown posts — with visual assets (tables, mermaid, svg → png) inserted where they genuinely aid understanding. The AI autonomously decides the topic framing, category, structure, whether the material warrants a single post or several, and when a visual earns its place. Trigger with /postify.
 argument-hint: "[optional: topic, angle, or what to write about]"
 ---
 
@@ -14,7 +14,7 @@ argument-hint: "[optional: topic, angle, or what to write about]"
 
 1. **독립성(standalone)이 절대 원칙이다.** 이 글은 지금 세션·대화의 맥락 없이도 처음 보는 독자가 온전히 이해할 수 있어야 한다. "위에서 본", "아까 그 파일" 같은 세션 의존적 참조, 로컬 환경명, 비공개 설정·경로 같은 사적 정보는 글에 남기지 않는다. 읽는 사람에게 필요한 전제는 글 안에서 스스로 갖춰 둔다.
 
-2. **구조·분류·분량은 AI가 소재에 맞게 자율적으로 정한다.** 정해진 틀은 없다. 이 소재를 가장 잘 전달하는 카테고리, 섹션 구성, 깊이를 그때그때 판단해서 짠다. 하나의 소재 안에 성격이 뚜렷이 다른 주제가 섞여 있으면 **여러 편의 포스트로 나누고**, 하나의 흐름으로 읽히는 게 더 나으면 한 편으로 묶는다. 이 결정 자체가 이 스킬에서 AI가 발휘해야 할 핵심 판단이다.
+2. **구조·분류·분량·시각 자료는 AI가 소재에 맞게 자율적으로 정한다.** 정해진 틀은 없다. 이 소재를 가장 잘 전달하는 카테고리, 섹션 구성, 깊이, 그리고 시각 자료의 유무·형태·개수를 그때그때 판단해서 짠다. 하나의 소재 안에 성격이 뚜렷이 다른 주제가 섞여 있으면 **여러 편의 포스트로 나누고**, 하나의 흐름으로 읽히는 게 더 나으면 한 편으로 묶는다. 이 결정 자체가 이 스킬에서 AI가 발휘해야 할 핵심 판단이다.
 
 고정된 템플릿을 따르지 마라. 틀에 소재를 욱여넣는 순간 글의 질이 떨어진다. 매번 "이 소재에 가장 맞는 형태는 무엇인가"를 새로 판단하는 것이 이 스킬의 작동 방식이다.
 
@@ -28,6 +28,7 @@ argument-hint: "[optional: topic, angle, or what to write about]"
 ### 2. 각 포스트를 설계한다
 - 카테고리, 태그, 섹션 구성, 깊이를 이 소재에 맞게 직접 짠다.
 - 무엇이 좋은 글인지를 기준으로 삼는다: 맥락을 모르는 독자가 따라올 수 있고, 중요한 것이 앞에 오며, 구체적인 사실·코드·수치가 주장 대신 근거가 되는 글.
+- 이 단계에서 **시각 자료가 이해를 크게 도울 자리가 있는지**도 함께 살핀다(아래 "시각 자료" 참고).
 
 ### 3. 제목을 짓는다
 - 제목은 **그 글의 내용을 대표하는 짧은 블로그 헤드라인**이다. 한 문장짜리 요약·초록이 아니라, 실제 블로그 글머리처럼 무엇에 관한 글인지 압축해 보여주는 짧은 제목.
@@ -36,15 +37,31 @@ argument-hint: "[optional: topic, angle, or what to write about]"
 ### 4. 글을 쓴다
 - **한국어 평서문("~이다" 체)**의 중립적이고 전문적인 톤을 기본으로 한다(`~구현했다`, `~달성하였다`, `~확인되었다`). 존댓말·구어체·명령형은 쓰지 않는다. 소재가 영어로 쓰는 게 자연스러우면 그 언어의 차분한 서술 톤을 따른다.
 - 독립성 원칙(위 1번)을 끝까지 지킨다.
+- 시각 자료가 이해를 돕는 자리에는 아래 원칙에 따라 넣는다.
 
 ### 5. 저장하고 제시한다
 - 활성 프로젝트 루트의 `docs/posts/` 디렉터리에 저장한다(없으면 생성).
 - 파일명: `YYYY-MM-DD-{slug}.md` (오늘 로컬 날짜 기준). 여러 편이면 각각 별도 파일로 저장한다.
-- 저장한 파일 경로를 클릭 가능한 링크로 제시하고, 각 글이 무엇을 담았는지 짧게 요약한다.
+- 시각 자료를 넣었으면 png와 소스를 `docs/posts/assets/{포스트-slug}/`에 함께 저장한다(자세한 배치는 `references/visual-assets.md`).
+- 저장한 파일 경로를 클릭 가능한 링크로 제시하고, 각 글이 무엇을 담았는지 짧게 요약한다. 시각 자료가 있으면 몇 개·어떤 형태인지, png가 실제 렌더되었는지도 함께 밝힌다.
+
+## 시각 자료 (Visual assets)
+
+시각 자료는 독자의 이해를 크게 높인다. 구조·흐름·관계·비교처럼 텍스트만으로는 머릿속에 잘 그려지지 않는 것을, 그림 하나가 정확히 전달한다. 그래서 이런 자리에는 **적극적으로** 넣는다. 형태에는 제한이 없다 — 소재에 따라 표, mermaid 다이어그램, svg, 그 밖에 무엇이든 가장 잘 전달하는 형태를 고른다.
+
+그러나 **남발하면 안 된다.** 필요 없는 시각 자료는 오히려 독자의 집중과 이해를 떨어뜨린다. 개수를 늘리려 하지 말고, 매 자료가 다음 테스트를 통과할 때만 넣는다: **"이게 없으면 독자가 이해에서 실제로 손해를 보는가."** 통과하지 못하는 장식·반복·분량 채우기용은 넣지 않는다. 판단이 서지 않으면 넣지 않는 쪽을 택한다. 한 편에 시각 자료가 하나도 없어도 되고, 정말 필요하면 여러 개여도 된다.
+
+산출 방식은 두 갈래다:
+
+- **표(마크다운 table)** 는 텍스트가 그 자체로 최종 형태이므로, 본문에 **직접** 쓴다. png로 만들지 않는다.
+- **mermaid·svg 등 렌더링형** 은 본문에 **자리 표시 마커**(무슨 그림인지 캡션 + png 경로)를 남기고, 실제 이미지를 **png로 함께 준비**한다. png와 함께 그 소스(svg/`.mmd`)도 남겨 나중에 작성자가 수정·재생성할 수 있게 한다.
+
+**시각 자료를 하나라도 넣기로 했다면, 넣기 전에 `references/visual-assets.md`를 읽는다.** 거기에 넣을지 말지 판단하는 기준, 형태 선택, 본문 마커의 정확한 형식, 파일 배치, png 렌더링 방법(headless Chrome으로 svg→png, mermaid-cli 등)과 도구가 없을 때의 폴백이 구체적으로 정의되어 있다.
 
 ## 지켜야 할 선
 
 - **독립성**: 세션 맥락 없이 읽힌다. 사적·로컬 정보는 뺀다.
 - **제목**: 요약 문장이 아니라 내용을 대표하는 짧은 제목.
-- **자율성**: 구조·분류·편수는 소재에 맞춰 직접 정한다. 정해진 틀 없음.
+- **자율성**: 구조·분류·편수·시각 자료는 소재에 맞춰 직접 정한다. 정해진 틀 없음.
 - **완결성**: 한 편 한 편이 그 자체로 읽을 가치가 있는 글이어야 한다. 분량을 채우기 위한 군더더기는 넣지 않는다.
+- **시각 자료의 절제**: 이해를 돕는 곳엔 적극 넣되, 남발하지 않는다. 렌더링형은 본문에 자리 표시를 남기고 png로 함께 준비하며, png를 못 만들었으면 소스를 남기고 그 사실을 사용자에게 알린다.
