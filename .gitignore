@@ -1,2 +1,7 @@
 .DS_Store
 *.log
+__pycache__/
+*.pyc
+
+# 참조 음성(클론용 원본)은 저장소에 올리지 않는다 — 로컬 전용 자산
+learn/assets/tts/
