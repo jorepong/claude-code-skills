@@ -10,16 +10,15 @@
 #   narrate.sh <폴더>
 #
 # 환경변수:
-#   LEARN_TTS_ENGINE  edge(기본) | qwen | say
-#     edge — Microsoft edge-tts(무료·키 불필요, 빠름). 기본 엔진.
-#     qwen — 로컬 Qwen3-TTS(MLX)의 x-vector 클로닝. 사용자가 준비한 참조 음성 폴더
-#            (reference.wav + reference.txt)가 필요하다(저장소에는 포함되지 않는다).
+#   LEARN_TTS_ENGINE  qwen(기본) | edge | say
+#     edge — Microsoft edge-tts(무료·키 불필요, 빠름). 사용자가 명시적으로 요청할 때만 선택.
+#     qwen — 로컬 Qwen3-TTS(MLX), 내장 참조 음성의 x-vector 클로닝.
 #     say  — macOS 내장(오프라인, 품질 낮음). 사용자가 명시적으로 요청할 때만 선택.
-#   LEARN_ALLOW_ALTERNATE_TTS 1이어야 say 선택을 허용한다.
+#   LEARN_ALLOW_ALTERNATE_TTS 1이어야 edge·say 선택을 허용한다.
 #   LEARN_REUSE_AUDIO 1이면 기존 audio/NN.mp3·NN.cues.json을 보존한 채 player만 다시 만든다.
 #   LEARN_TEXT_ONLY 1이면 TTS를 실행하지 않고 현재 챕터 메뉴가 든 읽기용 player만 만든다.
 #   LEARN_TTS_VOICE   음성 이름. 기본: edge=ko-KR-SunHiNeural, say=Yuna. (qwen은 아래 클론 목소리 사용)
-#   LEARN_TTS_VOICE_NAME qwen 클론 목소리를 이름으로 선택. ~/.claude/learn/.voices/<이름>/ 를 사용한다.
+#   LEARN_TTS_VOICE_NAME qwen 클론 목소리를 이름으로 선택. 내장 assets/tts/<이름>을 먼저 찾고, 없으면 ~/.claude/learn/.voices/<이름>.
 #   LEARN_TTS_VOICE_DIR  목소리 폴더를 경로로 직접 지정(이름보다 우선). 안에 reference.wav + reference.txt 가 목소리의 실체.
 #   LEARN_QWEN_BATCH_SIZE x-vector 텐서 배치 최대 크기. 기본 16. 32는 더 빠르지만 tail-latency 증가 가능.
 #   LEARN_QWEN_CHUNK_CHARS 긴 문장의 내부 분할 상한. 기본 240자(완성 뒤 한 문단 WAV로 재결합).
@@ -38,7 +37,7 @@
 
 set -euo pipefail
 
-ENGINE="${LEARN_TTS_ENGINE:-edge}"
+ENGINE="${LEARN_TTS_ENGINE:-qwen}"
 REUSE_AUDIO="${LEARN_REUSE_AUDIO:-0}"
 TEXT_ONLY="${LEARN_TEXT_ONLY:-0}"
 [ "$REUSE_AUDIO" = 1 ] && [ "$TEXT_ONLY" = 1 ] && {
@@ -52,18 +51,25 @@ MARKED="$SKILL_DIR/scripts/vendor/marked.min.js"
 # TTS 환경은 스킬 코드 밖(데이터 영역)에 두어 스킬을 가볍고 이식 가능하게 유지한다. 없으면 아래에서 자동 생성.
 TTS_VENV="$HOME/.claude/learn/.tts-venv"
 EDGE_BIN="$TTS_VENV/bin/edge-tts"
-# qwen(클로닝 낭독) 설정 — 생성 환경은 캐시하고, 참조 목소리는 사용자가 로컬에 준비한다.
+# qwen(클로닝 낭독) 설정 — 생성 환경은 캐시하고 참조 목소리는 스킬에 내장한다.
 QWEN_VENV="${LEARN_QWEN_VENV:-$HOME/.claude/learn/.tts-venv-qwen-xvector}"
 QWEN_PY="$QWEN_VENV/bin/python"
 QWEN_MODEL="${LEARN_QWEN_MODEL:-mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit}"
 QWEN_REQUIRED_MLX_AUDIO="0.5.0"
+BUILTIN_VOICES_ROOT="$SKILL_DIR/assets/tts"
 EXTERNAL_VOICES_ROOT="$HOME/.claude/learn/.voices"
-DEFAULT_QWEN_VOICE_NAME="default"
-# 목소리 선택 우선순위: 경로 직접지정(DIR) > 이름(NAME) > ~/.claude/learn/.voices/default
+DEFAULT_QWEN_VOICE_NAME="interviewee-en-34s"
+# 목소리 선택 우선순위: 경로 직접지정(DIR) > 이름(NAME: 내장 우선, 외부 폴백) > 기본 내장 참조
 if [ -n "${LEARN_TTS_VOICE_DIR:-}" ]; then
   QWEN_VOICE_DIR="$LEARN_TTS_VOICE_DIR"
+elif [ -n "${LEARN_TTS_VOICE_NAME:-}" ]; then
+  if [ -d "$BUILTIN_VOICES_ROOT/$LEARN_TTS_VOICE_NAME" ]; then
+    QWEN_VOICE_DIR="$BUILTIN_VOICES_ROOT/$LEARN_TTS_VOICE_NAME"
+  else
+    QWEN_VOICE_DIR="$EXTERNAL_VOICES_ROOT/$LEARN_TTS_VOICE_NAME"
+  fi
 else
-  QWEN_VOICE_DIR="$EXTERNAL_VOICES_ROOT/${LEARN_TTS_VOICE_NAME:-$DEFAULT_QWEN_VOICE_NAME}"
+  QWEN_VOICE_DIR="$BUILTIN_VOICES_ROOT/$DEFAULT_QWEN_VOICE_NAME"
 fi
 QWEN_REF_AUDIO="$QWEN_VOICE_DIR/reference.wav"
 QWEN_REF_TEXT_FILE="$QWEN_VOICE_DIR/reference.txt"
@@ -74,8 +80,8 @@ case "$ENGINE" in
   say)  VOICE="${LEARN_TTS_VOICE:-Yuna}" ;;
   *) echo "알 수 없는 LEARN_TTS_ENGINE: $ENGINE (qwen|edge|say)" >&2; exit 1 ;;
 esac
-if [ "$NEEDS_TTS" = 1 ] && [ "$ENGINE" = say ] && [ "${LEARN_ALLOW_ALTERNATE_TTS:-0}" != 1 ]; then
-  echo "say 음성은 사용자가 명시적으로 요청한 경우에만 LEARN_ALLOW_ALTERNATE_TTS=1과 함께 선택할 수 있습니다." >&2
+if [ "$NEEDS_TTS" = 1 ] && [ "$ENGINE" != qwen ] && [ "${LEARN_ALLOW_ALTERNATE_TTS:-0}" != 1 ]; then
+  echo "edge·say 음성은 사용자가 명시적으로 요청한 경우에만 LEARN_ALLOW_ALTERNATE_TTS=1과 함께 선택할 수 있습니다." >&2
   exit 1
 fi
 
@@ -96,15 +102,7 @@ if [ "$NEEDS_TTS" = 1 ] && [ "$ENGINE" = edge ] && [ ! -x "$EDGE_BIN" ]; then
     || { echo "edge-tts 자동 설치 실패. 수동: python3 -m venv \"$TTS_VENV\" && \"$TTS_VENV/bin/pip\" install edge-tts" >&2; exit 1; }
 fi
 if [ "$NEEDS_TTS" = 1 ] && [ "$ENGINE" = say ]; then command -v say >/dev/null || { echo "say 없음(macOS 필요)" >&2; exit 1; }; fi
-if [ "$NEEDS_TTS" = 1 ] && [ "$ENGINE" = edge ]; then echo "낭독 엔진: edge-tts(음성 $VOICE)" >&2; fi
 if [ "$NEEDS_TTS" = 1 ] && [ "$ENGINE" = qwen ]; then
-  # 참조 음성은 저장소에 포함되지 않는 로컬 전용 자산이다. 환경을 만들기 전에 먼저 확인한다.
-  [ -f "$QWEN_REF_AUDIO" ] || {
-    echo "클론 목소리 참조 오디오 없음: $QWEN_REF_AUDIO" >&2
-    echo "참조 음성은 저장소에 포함되지 않습니다. LEARN_TTS_VOICE_DIR로 reference.wav·reference.txt가 있는 폴더를 지정하거나, 기본 엔진(edge)으로 렌더하세요." >&2
-    exit 1
-  }
-  [ -f "$QWEN_REF_TEXT_FILE" ] || { echo "클론 목소리 참조 대본 없음: $QWEN_REF_TEXT_FILE" >&2; exit 1; }
   qwen_env_ready() {
     [ -x "$QWEN_PY" ] && "$QWEN_PY" -c \
       "import importlib.metadata as m; assert m.version('mlx-audio') == '$QWEN_REQUIRED_MLX_AUDIO'" \
@@ -125,6 +123,8 @@ if [ "$NEEDS_TTS" = 1 ] && [ "$ENGINE" = qwen ]; then
   qwen_env_ready || { echo "Qwen TTS 환경 구성 실패: $QWEN_VENV" >&2; exit 1; }
   "$QWEN_PY" "$SKILL_DIR/scripts/patch_mlx_audio_xvector_batch.py" \
     || { echo "MLX-Audio x-vector 배치 호환 패치 실패" >&2; exit 1; }
+  [ -f "$QWEN_REF_AUDIO" ] || { echo "클론 목소리 참조 오디오 없음: $QWEN_REF_AUDIO" >&2; exit 1; }
+  [ -f "$QWEN_REF_TEXT_FILE" ] || { echo "클론 목소리 참조 대본 없음: $QWEN_REF_TEXT_FILE" >&2; exit 1; }
   echo "낭독 엔진: qwen x-vector(참조 $(basename "$QWEN_VOICE_DIR"), 전체 조각 디코드/최대 배치 ${LEARN_QWEN_BATCH_SIZE:-16}, 내부 분할 ${LEARN_QWEN_CHUNK_CHARS:-240}자, 0.6B 8bit 가중치)" >&2
 fi
 
@@ -452,7 +452,10 @@ body{font-family:'Pretendard',-apple-system,"Apple SD Gothic Neo",Segoe UI,Robot
 #doc pre code{font-family:'SF Mono',ui-monospace,Menlo,monospace}
 #doc pre.code{padding-top:36px}
 #doc pre.code::before{content:''; position:absolute; top:14px; left:18px; width:9px; height:9px; border-radius:50%; background:#e0a99a; box-shadow:15px 0 #e6cf9a,30px 0 #a6c9a0}
-#doc pre.code::after{content:'code'; position:absolute; top:11px; right:16px; font-size:11px; color:var(--faint); letter-spacing:.08em}
+#doc pre.code::after{content:attr(data-badge); position:absolute; top:11px; right:16px; font-size:11px; color:var(--faint); letter-spacing:.08em; max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+#doc pre.code:not([data-badge])::after{content:'code'}
+#doc pre.code[data-badge]::after{letter-spacing:.01em; max-width:72%}
+#doc pre.code[data-src="file"]::after, #doc pre.code[data-src="ref"]::after{font-family:'SF Mono',ui-monospace,Menlo,monospace}
 #doc pre.diagram{background:#fcf9f3; border-style:dashed; padding-top:34px}
 #doc pre.diagram::after{content:'그림'; position:absolute; top:11px; right:16px; font-size:11px; color:var(--faint); letter-spacing:.08em}
 #doc pre.mermaid-card{background:var(--paper); border:1px solid var(--line); border-style:solid; padding:20px; text-align:center; white-space:normal; line-height:normal; position:relative}
@@ -603,6 +606,16 @@ let cur=-1, curCues=[], curMap=[], curHl=-1, pausedGates=new Set(), audioReady=f
 let rows=[], subLinks=[], subHeads=[];
 
 if(window.marked&&marked.setOptions) marked.setOptions({gfm:true, breaks:false});
+// 코드 펜스 정보 문자열(```lang file=경로:줄 | example | pseudo | ref=경로 | adapted=경로 | cmd)을 보존한다.
+// marked는 첫 단어(언어)만 class로 남기므로, 출처 키워드를 data-* 속성으로 옮겨 코드 카드 배지가 읽게 한다(notation.md).
+if(window.marked&&marked.use){ try{ marked.use({renderer:{code:function(code, info, escaped){
+  var toks=String(info||'').trim().split(/\s+/).filter(Boolean), lang=toks[0]||'', src='', path='';
+  if(lang==='pseudo') src='pseudo';
+  toks.slice(1).forEach(function(t){ var m=t.match(/^(file|ref|adapted)=(.+)$/); if(m){ src=m[1]; path=m[2]; } else if(/^(example|pseudo|cmd)$/.test(t)) src=t; });
+  var attrs=(src?' data-src="'+src+'"':'')+(path?' data-path="'+esc(path)+'"':'');
+  var body=escaped?code:esc(code);
+  return '<pre'+attrs+'><code'+(lang?' class="language-'+esc(lang)+'"':'')+'>'+body+'</code>\n</pre>\n';
+}}}); }catch(e){} }
 if(window.mermaid) try{ mermaid.initialize({startOnLoad:false, theme:'base', htmlLabels:false, flowchart:{htmlLabels:false}, themeVariables:{fontFamily:"'Pretendard',sans-serif", fontSize:'14px', primaryColor:'#fff8f0', primaryBorderColor:'#b3541b', primaryTextColor:'#221f1a', lineColor:'#8a8377', secondaryColor:'#eef7ee', tertiaryColor:'#fdf3f0', background:'#fffdf9'}}); }catch(e){}
 function md(t){
   try{
@@ -735,7 +748,7 @@ function enhanceDoc(){
     } }
   renderMath();
   renderVegaLite();
-  if(window.hljs){ docEl.querySelectorAll('pre code[class*="language-"]:not(.language-mermaid):not(.language-vega-lite)').forEach(function(el){ try{hljs.highlightElement(el);}catch(e){} }); }
+  if(window.hljs){ docEl.querySelectorAll('pre code[class*="language-"]:not(.language-mermaid):not(.language-vega-lite):not(.language-pseudo)').forEach(function(el){ try{hljs.highlightElement(el);}catch(e){} }); }
   docEl.querySelectorAll('blockquote').forEach(function(bq){
     var t=(bq.textContent||'').slice(0,46), c='';
     if(bq.querySelector('details')) c='gate';                 // 게이트 = 답을 접은 인출 블록(이모지에 의존하지 않음)
@@ -751,6 +764,11 @@ function enhanceDoc(){
     var lang=!!(code&&/language-/.test(code.className||''));
     var s=pre.textContent||'', diag=/[│├─└┌┐┘▼▶►◄╭╮╯╰↑↓→←↔⟶⟵]|──|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫]/.test(s);
     pre.classList.add(lang?'code':(diag?'diagram':'code'));   // 언어 없는 펜스(도식·절차 목록)는 '그림' 카드로
+    // 코드 출처 배지(notation.md): 펜스 정보 문자열의 키워드를 카드 우상단 작은 글씨로. 본문 문단으로 쓰지 않는다.
+    var src=pre.getAttribute('data-src')||'', path=pre.getAttribute('data-path')||'';
+    var badge={example:'예제 · 실제 파일 아님', pseudo:'의사코드 · 실행 코드 아님', cmd:'명령 예제 · 실제 스크립트 아님',
+               file:path, ref:'참조 구현 · '+path, adapted:'축약 예제 · 원본 '+path+' 과 다름'}[src];
+    if(badge){ pre.setAttribute('data-badge', badge); pre.title=badge; }
   });
   docEl.querySelectorAll('p,li').forEach(function(el){
     if(/[❶-❿]/.test(el.textContent)) el.innerHTML=el.innerHTML.replace(/([❶-❿])/g,'<span class="anc">$1</span>');
