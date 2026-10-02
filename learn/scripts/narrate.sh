@@ -1119,6 +1119,7 @@ PY
 # 완성된 스테이징 산출물을 검증한 뒤에만 공개 경로로 교체한다.
 if command -v node >/dev/null 2>&1; then
   node "$SKILL_DIR/scripts/verify-align.js" "$FOLDER" "$stage" || true
+  node "$SKILL_DIR/scripts/lint-doc.js" "$FOLDER" || true
 else
   echo "(node 없음 — 하이라이트 정렬 검증 건너뜀)"
 fi

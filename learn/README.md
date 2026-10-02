@@ -45,6 +45,7 @@ learn은 그 순간 AI의 정체성을 바꿉니다. 효율적인 어시스턴�
   - `visuals.md` · `animation.md` · `simulation.md` · `remotion/` — 매체 선택, 정적 도식, 애니메이션, 인터랙티브 시뮬레이션의 작법과 런타임 계약.
 - `scripts/build-players.sh` — 현재 챕터를 모두 색인한 읽기용 HTML을 음성 없이 즉시 생성.
 - `scripts/narrate.sh` — 모든 문서 완성 뒤 챕터 순서로 음성을 렌더하고 같은 HTML에 결합.
+- `scripts/lint-doc.js` · `scripts/qa-svg.sh` — 시각 밀도·상대 시점 표현·출처 표기·낭독 반복을 경고하는 린트와, 손 SVG를 본문 폭으로 축소 렌더해 겹침을 눈으로 잡는 검사.
 - `assets/remotion-runtime/` · `scripts/setup-remotion-runtime.sh` — Remotion Player·React 시뮬레이션·Studio·렌더·로컬 자산을 지원하는 자체 런타임.
 
 > 이 스킬은 개인 프로젝트(CodeLayer)의 학습 엔진을 떼어내 어디서든 쓸 수 있게 일반화한 것입니다.
