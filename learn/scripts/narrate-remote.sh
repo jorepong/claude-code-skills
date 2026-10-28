@@ -2,7 +2,7 @@
 # narrate-remote.sh — 낭독 렌더(narrate.sh)를 다른 맥에서 돌리고 결과를 가져온다.
 #
 # 사양이 낮은 기기에서 Qwen3-TTS를 직접 돌리지 않으려고 쓴다. 보통은 직접 부르지 않는다 —
-# ~/.claude/learn/.render-host 파일에 호스트 이름(예: macbookair)이 있으면 narrate.sh가 이 스크립트로 넘긴다.
+# ~/.claude/learn/.render-host 파일에 SSH 호스트 이름(예: render-mac)이 있으면 narrate.sh가 이 스크립트로 넘긴다.
 #
 # 사용법:
 #   narrate-remote.sh <호스트> <폴더>
