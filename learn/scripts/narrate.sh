@@ -47,6 +47,12 @@ TEXT_ONLY="${LEARN_TEXT_ONLY:-0}"
 NEEDS_TTS=1
 if [ "$REUSE_AUDIO" = 1 ] || [ "$TEXT_ONLY" = 1 ]; then NEEDS_TTS=0; fi
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# 사양이 낮은 기기는 음성 렌더를 다른 맥에 맡긴다 — ~/.claude/learn/.render-host 첫 줄이 그 호스트 이름이다.
+# LEARN_RENDER_LOCAL=1이면(원격에서 도는 중이거나 이 기기에서 돌리고 싶을 때) 넘기지 않는다.
+RENDER_HOST_FILE="$HOME/.claude/learn/.render-host"
+if [ "$NEEDS_TTS" = 1 ] && [ "${LEARN_RENDER_LOCAL:-0}" != 1 ] && [ -s "$RENDER_HOST_FILE" ]; then
+  exec bash "$SKILL_DIR/scripts/narrate-remote.sh" "$(head -1 "$RENDER_HOST_FILE" | tr -d '[:space:]')" "$@"
+fi
 MARKED="$SKILL_DIR/scripts/vendor/marked.min.js"
 # TTS 환경은 스킬 코드 밖(데이터 영역)에 두어 스킬을 가볍고 이식 가능하게 유지한다. 없으면 아래에서 자동 생성.
 TTS_VENV="$HOME/.claude/learn/.tts-venv"

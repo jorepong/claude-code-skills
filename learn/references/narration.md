@@ -133,6 +133,7 @@ title: resolveToken — 요청에서 토큰을 꺼내는 방법
 ~/.claude/skills/learn/scripts/narrate.sh <폴더>
 ```
 
+- **렌더를 다른 맥에 맡길 수 있다.** `~/.claude/learn/.render-host` 첫 줄에 호스트 이름(예: `macbookair` — Tailscale 이름)이 있으면, `narrate.sh`는 음성을 합성할 때 `scripts/narrate-remote.sh`로 넘긴다. 이 스크립트는 접속을 확인하고, 이 기기의 렌더 코드(`scripts/` · `assets/tts/`)를 원격 `~/.claude/learn/.remote-skill/`로 보낸 뒤, 폴더를 원격의 같은 경로로 복사해 그 렌더 코드로 `narrate.sh`를 돌리고(`caffeinate`로 잠들지 않게) 음성 · player가 든 폴더를 다시 가져온다. 렌더는 원격에 설치된 learn이 아니라 이 기기에서 보낸 코드로 하므로 두 기기의 learn 판이 달라도 된다 — 원격에는 음성 모델 환경 · ffmpeg · uv만 있으면 된다. 사양이 낮은 기기(메모리 8GB 맥미니)에는 이 파일을 두고, 렌더를 맡는 맥에는 두지 않는다. 원격에 접속할 수 없으면 이 기기에서 읽기용 player만 만들고 종료 코드 2로 끝난다 — 그때는 학습자에게 "음성은 원격 맥이 켜지면 붙인다"고 말하고, 원격 맥이 켜진 뒤 같은 명령을 다시 실행한다. 이 기기에서 그냥 돌리려면 `LEARN_RENDER_LOCAL=1 narrate.sh <폴더>`, 접속만 확인하려면 `LEARN_REMOTE_CHECK=1 narrate.sh <폴더>`.
 - `<폴더>` 안의 모든 `NN-*.script.md`를 챕터 번호 순서로 렌더한다. Qwen 모델과 참조 임베딩은 한 번만 로드하고, 한 챕터 안에서는 비슷한 길이의 조각을 텐서 배치한다. 문단별 PCM WAV를 이어 **한 번만 MP3로 인코딩**한 `audio/NN.mp3`와, 문단 시작·길이·태그 및 동적 시각 stage 오프셋을 담은 `audio/NN.cues.json`을 만든다.
 - 렌더가 끝나면 각 `<NN-슬러그>.player.html`을 다시 만들며, 모든 파일의 좌측 메뉴에는 전체 챕터가 들어간다. (`LEARN_PLAYER=point`을 주면 전 챕터를 한 파일로 묶은 통합 `player.html` 하나를 대신 만든다.) 같은 폴더를 잠그고 모든 음성·플레이어를 스테이징에서 완성한 뒤 교체하므로, 렌더 중에는 기존 읽기용 HTML이 온전히 유지되고 실패한 재실행도 기존 산출물을 반쯤 덮지 않는다.
 - 동적 시각 번들이나 player 템플릿만 바뀌어 음성을 다시 합성할 필요가 없으면 `LEARN_REUSE_AUDIO=1 narrate.sh <폴더>`를 사용한다. 기존 `audio/NN.mp3`와 `NN.cues.json`을 모두 확인한 뒤 보존하고 player만 다시 만든다. 스크립트 문장이나 `[[stage:...]]` 위치가 바뀌었다면 재사용하지 말고 정상 렌더한다.
